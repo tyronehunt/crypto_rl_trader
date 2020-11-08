@@ -13,9 +13,9 @@ from sklearn.preprocessing import StandardScaler
 
 
 # Three sets of stock data: AAPL (Apple), MSI (Motorola), SBUX (Starbucks)
-def get_data():
+def get_data(data_filepath):
     # returns a T x 3 list of (daily close) close prices
-    df = pd.read_csv('./data/btc_ohlc_1d.csv')
+    df = pd.read_csv(data_filepath)
     return df.values
 
 
@@ -168,6 +168,8 @@ class MultiStockEnv:
         self.stock_owned = np.zeros(self.n_stock)
         self.stock_price = self.stock_price_history[self.cur_step]
         self.cash_in_hand = self.initial_investment
+        self.trade_fee = 0.001
+        self.min_buy_amount = 200
         return self._get_obs()
 
     def step(self, action):
@@ -230,24 +232,19 @@ class MultiStockEnv:
             elif a == 2:
                 buy_index.append(i)
 
-        # sell any stocks we want to sell
-        # then buy any stocks we want to buy
+        # sell any stocks we want to sell before we buy any stocks we want to buy
         if sell_index:
             # NOTE: to simplify the problem, when we sell, we will sell ALL shares of that stock
             for i in sell_index:
-                self.cash_in_hand += self.stock_price[i] * self.stock_owned[i]
+                self.cash_in_hand += self.stock_price[i] * self.stock_owned[i] * (1 - self.trade_fee)
                 self.stock_owned[i] = 0
         if buy_index:
-            # NOTE: when buying, we will loop through each stock we want to buy,
-            #       and buy one share at a time until we run out of cash
-            can_buy = True
-            while can_buy:
+            # NOTE: when buying, we will split cash in hand evenly between the purchases
+            if self.cash_in_hand > len(buy_index) * self.min_buy_amount:
+                buy_amount = np.floor(self.cash_in_hand/len(buy_index))
                 for i in buy_index:
-                    if self.cash_in_hand > self.stock_price[i]:
-                        self.stock_owned[i] += 1  # buy one share
-                        self.cash_in_hand -= self.stock_price[i]
-                    else:
-                        can_buy = False
+                    self.stock_owned[i] += buy_amount * (1 - self.trade_fee) / self.stock_price[i]
+                    self.cash_in_hand -= buy_amount
 
 
 class DQNAgent(object):
@@ -324,6 +321,9 @@ def play_one_episode(agent, env, is_train):
 if __name__ == '__main__':
 
     # config
+    cmd_line = False
+    args_mode = 'train'
+
     models_folder = 'linear_rl_trader_models'
     rewards_folder = 'linear_rl_trader_rewards' # from both train / test phases.
     num_episodes = 2000
@@ -331,21 +331,24 @@ if __name__ == '__main__':
     initial_investment = 20000
 
     # Enable running the script with command line arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--mode', type=str, required=True,
-                        help='--mode can be either "train" or "test"')
-    args = parser.parse_args()
+    if cmd_line:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-m', '--mode', type=str, required=True,
+                            help='--mode can be either "train" or "test"')
+        args = parser.parse_args()
+        args_mode = args.mode
 
     # Create directories, if not already exist.
     maybe_make_dir(models_folder)
     maybe_make_dir(rewards_folder)
 
     # Fetch time series
-    data = get_data()
+    data = get_data('./data/btc_ohlc_1d.csv')
     n_timesteps, n_stocks = data.shape
 
     # Using 50:50 train/test split
-    n_train = n_timesteps // 2
+    train_ratio = 0.8
+    n_train = np.floor(n_timesteps * train_ratio).astype(int)
     train_data = data[:n_train]
     test_data = data[n_train:]
 
@@ -359,7 +362,7 @@ if __name__ == '__main__':
     # store the final value of the portfolio (end of episode)
     portfolio_value = []
 
-    if args.mode == 'test':
+    if args_mode == 'test':
         # then load the previous scaler (must be the same as train!)
         with open(f"{models_folder}/scaler.pkl", 'rb') as f:
             scaler = pickle.load(f)
@@ -377,14 +380,13 @@ if __name__ == '__main__':
     # play the game num_episodes times
     for e in range(num_episodes):
         t0 = datetime.now()
-        val = play_one_episode(agent, env, args.mode)
+        val = play_one_episode(agent, env, args_mode)
         dt = datetime.now() - t0
         print(f"episode: {e + 1}/{num_episodes}, episode end value: {val:.2f}, duration: {dt}")
         portfolio_value.append(val)  # append episode end portfolio value
 
     # save the weights when we are done
-    # if args.mode == 'train':
-    if args.mode == 'train':
+    if args_mode == 'train':
         # save the DQN Agent
         agent.save(f'{models_folder}/linear.npz')
 
@@ -397,4 +399,4 @@ if __name__ == '__main__':
         plt.show()
 
     # save list of each of the episodes final portfolio values
-    np.save(f'{rewards_folder}/{args.mode}.npy', portfolio_value)
+    np.save(f'{rewards_folder}/{args_mode}.npy', portfolio_value)
