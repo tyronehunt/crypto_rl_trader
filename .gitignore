@@ -1,5 +1,6 @@
 data/
 env/
+venv/
 *bitstamp*
 *btc_ohlc*
 .idea/

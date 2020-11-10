@@ -1,28 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
 from datetime import datetime
 import argparse
 import pickle
 
 from DQNAgent import DQNAgent
 from MultiStockEnv import MultiStockEnv
-from utils import get_data, maybe_make_dir, play_one_episode
-
+from utils import maybe_make_dir, play_one_episode
+from prepare_trade_data import get_data, convert_to_ohlc
 
 if __name__ == '__main__':
 
     # config
-    cmd_line = False
-    args_mode = 'train'
-
     models_folder = 'linear_rl_trader_models'
-    rewards_folder = 'linear_rl_trader_rewards' # from both train / test phases.
+    rewards_folder = 'linear_rl_trader_rewards'  # from both train / test phases.
     num_episodes = 2000
-    batch_size = 32 # for sampling from replay memory
+    batch_size = 32  # for sampling from replay memory
     initial_investment = 20000
 
-    # Enable running the script with command line arguments
+    # Enable running the script with command line arguments (or not)
+    cmd_line = False
+    args_mode = 'train'
     if cmd_line:
         parser = argparse.ArgumentParser()
         parser.add_argument('-m', '--mode', type=str, required=True,
@@ -35,7 +33,12 @@ if __name__ == '__main__':
     maybe_make_dir(rewards_folder)
 
     # Fetch time series
-    data = get_data('./data/btc_ohlc_1d.csv')
+    try:
+        data = get_data('./data/btc_ohlc_1d.csv')
+    except:
+        convert_to_ohlc()
+        data = get_data('./data/btc_ohlc_1d.csv')
+
     n_timesteps, n_stocks = data.shape
 
     # Create train/test split

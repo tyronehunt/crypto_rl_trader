@@ -1,12 +1,4 @@
 import os
-import numpy as np
-import pandas as pd
-
-
-def get_data(data_filepath):
-    # returns a T x 3 list of (daily close) close prices
-    df = pd.read_csv(data_filepath)
-    return df.values
 
 
 def maybe_make_dir(directory):
