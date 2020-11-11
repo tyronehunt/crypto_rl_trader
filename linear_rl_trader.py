@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     # Enable running the script with command line arguments (or not)
     cmd_line = False
-    args_mode = 'train'
+    args_mode = 'test'
     if cmd_line:
         parser = argparse.ArgumentParser()
         parser.add_argument('-m', '--mode', type=str, required=True,
@@ -64,6 +64,7 @@ if __name__ == '__main__':
 
         # remake the env with test data
         env = MultiStockEnv(test_data, initial_investment)
+        env.set_scaler(scaler)
 
         # make sure epsilon is not default value = 1! (otherwise pure exploration)
         # no need to run multiple episodes if epsilon = 0, it's deterministic
@@ -95,3 +96,8 @@ if __name__ == '__main__':
 
     # save list of each of the episodes final portfolio values
     np.save(f'{rewards_folder}/{args_mode}.npy', portfolio_value)
+
+    if args_mode == 'train':
+        print(f"hodl amount: {env.n_hodl * train_data[-1][0]}")
+    if args_mode == 'test':
+        print(f"hodl amount: {env.n_hodl * test_data[-1][0]}")

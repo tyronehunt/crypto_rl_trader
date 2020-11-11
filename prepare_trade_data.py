@@ -47,6 +47,8 @@ def get_data(data_filepath):
     # TEMPORARY WORK AROUND TO GET INTO FORMAT REQUIRED FOR LINEAR_RL_TRADER.PY
     df = df[['Close', 'Volume']]
     df = add_indicators(df)
+
+    df = df.dropna(subset=['MACD'])
     return df.values
 
 

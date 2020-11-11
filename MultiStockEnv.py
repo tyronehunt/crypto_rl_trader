@@ -22,9 +22,9 @@ class MultiStockEnv:
 
     def __init__(self, data, initial_investment=20000):
         # data
-        self.stock_price_history = data
+        self.stock_price_history = data[:, [0]]
         self.n_step, self.n_stock = self.stock_price_history.shape
-        print(self.n_step)
+        self.n_hodl = initial_investment / self.stock_price_history[0]
 
         # instance attributes
         self.initial_investment = initial_investment
@@ -48,8 +48,8 @@ class MultiStockEnv:
         # 2 = buy
         self.action_list = list(map(list, itertools.product([0, 1, 2], repeat=self.n_stock)))
 
-        # calculate size of state (as per definition above)
-        self.state_dim = self.n_stock * 2 + 1
+        # calculate size of state ( Shape of data, less the price column)
+        self.state_dim = data.shape[1] - self.n_stock
 
         self.reset()
 
@@ -83,6 +83,9 @@ class MultiStockEnv:
         scaler.fit(states)
         self.scaler = scaler
         return self.scaler
+
+    def set_scaler(self, scaler_in):
+        self.scaler = scaler_in
 
     def step(self, action):
         """ Perform action in environment and return next state and reward """
